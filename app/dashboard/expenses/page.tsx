@@ -39,11 +39,13 @@ export default function ExpensesPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const { data: { user } } = await supabase.auth.getUser()
     await supabase.from('gg_expenses').insert([{
       ...form,
       amount: parseFloat(form.amount),
       employee_name: form.employee_name || null,
-      note: form.note || null
+      note: form.note || null,
+      user_id: user?.id
     }])
     setForm({ date: '', category: categories[0], description: '', employee_name: '', amount: '', note: '' })
     setShowForm(false)
@@ -121,41 +123,61 @@ export default function ExpensesPage() {
         </form>
       )}
 
-      {loading ? <div className="text-gray-400">กำลังโหลด...</div> : (
-        <div className="bg-[#1a1a1a] border border-[#C9922A]/20 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[#333] text-gray-400">
-                <th className="text-left px-4 py-3">วันที่</th>
-                <th className="text-left px-4 py-3">หมวดหมู่</th>
-                <th className="text-left px-4 py-3">รายละเอียด</th>
-                <th className="text-left px-4 py-3">พนักงาน</th>
-                <th className="text-left px-4 py-3">จำนวนเงิน</th>
-                <th className="text-left px-4 py-3">หมายเหตุ</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {expenses.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-8 text-gray-500">ยังไม่มีข้อมูลเดือนนี้</td></tr>
-              ) : expenses.map(exp => (
-                <tr key={exp.id} className="border-b border-[#242424] hover:bg-[#242424]/50">
-                  <td className="px-4 py-3 text-gray-400">{new Date(exp.date).toLocaleDateString('th-TH')}</td>
-                  <td className="px-4 py-3">
-                    <span className="px-2 py-1 rounded-full text-xs bg-[#C9922A]/20 text-[#C9922A]">{exp.category}</span>
-                  </td>
-                  <td className="px-4 py-3 text-white">{exp.description}</td>
-                  <td className="px-4 py-3 text-gray-400">{exp.employee_name || '-'}</td>
-                  <td className="px-4 py-3 text-white font-medium">{exp.amount.toLocaleString()} บาท</td>
-                  <td className="px-4 py-3 text-gray-400">{exp.note || '-'}</td>
-                  <td className="px-4 py-3">
-                    <button onClick={() => handleDelete(exp.id)} className="text-red-400 hover:text-red-300 text-xs">ลบ</button>
-                  </td>
+      {loading ? <div className="text-gray-400">กำลังโหลด...</div> : expenses.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">ยังไม่มีข้อมูลเดือนนี้</div>
+      ) : (
+        <>
+          {/* Desktop table */}
+          <div className="hidden md:block bg-[#1a1a1a] border border-[#C9922A]/20 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#333] text-gray-400">
+                  <th className="text-left px-4 py-3">วันที่</th>
+                  <th className="text-left px-4 py-3">หมวดหมู่</th>
+                  <th className="text-left px-4 py-3">รายละเอียด</th>
+                  <th className="text-left px-4 py-3">พนักงาน</th>
+                  <th className="text-left px-4 py-3">จำนวนเงิน</th>
+                  <th className="text-left px-4 py-3">หมายเหตุ</th>
+                  <th className="px-4 py-3"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {expenses.map(exp => (
+                  <tr key={exp.id} className="border-b border-[#242424] hover:bg-[#242424]/50">
+                    <td className="px-4 py-3 text-gray-400">{new Date(exp.date).toLocaleDateString('th-TH', { year: 'numeric', month: 'numeric', day: 'numeric' }).replace(/\d{4}/, y => String(parseInt(y) + 543))}</td>
+                    <td className="px-4 py-3"><span className="px-2 py-1 rounded-full text-xs bg-[#C9922A]/20 text-[#C9922A]">{exp.category}</span></td>
+                    <td className="px-4 py-3 text-white">{exp.description}</td>
+                    <td className="px-4 py-3 text-gray-400">{exp.employee_name || '-'}</td>
+                    <td className="px-4 py-3 text-white font-medium">{exp.amount.toLocaleString()} บาท</td>
+                    <td className="px-4 py-3 text-gray-400">{exp.note || '-'}</td>
+                    <td className="px-4 py-3"><button onClick={() => handleDelete(exp.id)} className="text-red-400 text-xs">ลบ</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden flex flex-col gap-3">
+            {expenses.map(exp => (
+              <div key={exp.id} className="bg-[#1a1a1a] border border-[#C9922A]/20 rounded-xl p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-white font-semibold">{exp.description}</span>
+                  <span className="text-[#C9922A] font-bold">{exp.amount.toLocaleString()} บาท</span>
+                </div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="px-2 py-1 rounded-full text-xs bg-[#C9922A]/20 text-[#C9922A]">{exp.category}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-y-1 text-sm">
+                  <span className="text-gray-500">วันที่</span><span className="text-gray-300">{new Date(exp.date).toLocaleDateString('th-TH', { year: 'numeric', month: 'numeric', day: 'numeric' }).replace(/\d{4}/, y => String(parseInt(y) + 543))}</span>
+                  {exp.employee_name && <><span className="text-gray-500">พนักงาน</span><span className="text-gray-300">{exp.employee_name}</span></>}
+                  {exp.note && <><span className="text-gray-500">หมายเหตุ</span><span className="text-gray-300">{exp.note}</span></>}
+                </div>
+                <button onClick={() => handleDelete(exp.id)} className="mt-3 text-red-400 text-xs">ลบ</button>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   )

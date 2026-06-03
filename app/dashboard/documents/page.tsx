@@ -151,51 +151,72 @@ export default function DocumentsPage() {
         </form>
       )}
 
-      {loading ? <div className="text-gray-400">กำลังโหลด...</div> : (
-        <div className="bg-[#1a1a1a] border border-[#C9922A]/20 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[#333] text-gray-400">
-                <th className="text-left px-4 py-3">ผู้ส่ง</th>
-                <th className="text-left px-4 py-3">วันที่รับ (พ.ศ.)</th>
-                <th className="text-left px-4 py-3">ฝ่าย</th>
-                <th className="text-left px-4 py-3">ส่ง HQ (พ.ศ.)</th>
-                <th className="text-left px-4 py-3">ค่าใช้จ่าย</th>
-                <th className="text-left px-4 py-3">หมายเหตุ</th>
-                <th className="px-4 py-3">รูป</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {docs.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-8 text-gray-500">ยังไม่มีข้อมูลเดือนนี้</td></tr>
-              ) : docs.map(doc => (
-                <tr key={doc.id} className="border-b border-[#242424] hover:bg-[#242424]/50">
-                  <td className="px-4 py-3 text-white">{doc.sender_name}</td>
-                  <td className="px-4 py-3 text-gray-400">{toThaiDate(doc.received_date)}</td>
-                  <td className="px-4 py-3">
-                    <span className="px-2 py-1 rounded-full text-xs bg-[#C9922A]/20 text-[#C9922A]">{doc.department}</span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-400">{doc.sent_to_hq_date ? toThaiDate(doc.sent_to_hq_date) : '-'}</td>
-                  <td className="px-4 py-3 text-gray-400">{doc.cost ? `${doc.cost.toLocaleString()} บาท` : '-'}</td>
-                  <td className="px-4 py-3 text-gray-400">{doc.note || '-'}</td>
-                  <td className="px-4 py-3">
-                    {doc.image_urls && doc.image_urls.length > 0 ? (
-                      <div className="flex flex-col gap-1">
-                        {doc.image_urls.map((url, i) => (
-                          <a key={i} href={url} target="_blank" rel="noreferrer" className="text-[#C9922A] text-xs underline">รูป {i + 1}</a>
-                        ))}
-                      </div>
-                    ) : '-'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <button onClick={() => handleDelete(doc.id)} className="text-red-400 hover:text-red-300 text-xs">ลบ</button>
-                  </td>
+      {loading ? <div className="text-gray-400">กำลังโหลด...</div> : docs.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">ยังไม่มีข้อมูลเดือนนี้</div>
+      ) : (
+        <>
+          {/* Desktop table */}
+          <div className="hidden md:block bg-[#1a1a1a] border border-[#C9922A]/20 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#333] text-gray-400">
+                  <th className="text-left px-4 py-3">ผู้ส่ง</th>
+                  <th className="text-left px-4 py-3">วันที่รับ</th>
+                  <th className="text-left px-4 py-3">ฝ่าย</th>
+                  <th className="text-left px-4 py-3">ส่ง HQ</th>
+                  <th className="text-left px-4 py-3">ค่าใช้จ่าย</th>
+                  <th className="text-left px-4 py-3">หมายเหตุ</th>
+                  <th className="px-4 py-3">รูป</th>
+                  <th className="px-4 py-3"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {docs.map(doc => (
+                  <tr key={doc.id} className="border-b border-[#242424] hover:bg-[#242424]/50">
+                    <td className="px-4 py-3 text-white">{doc.sender_name}</td>
+                    <td className="px-4 py-3 text-gray-400">{toThaiDate(doc.received_date)}</td>
+                    <td className="px-4 py-3"><span className="px-2 py-1 rounded-full text-xs bg-[#C9922A]/20 text-[#C9922A]">{doc.department}</span></td>
+                    <td className="px-4 py-3 text-gray-400">{doc.sent_to_hq_date ? toThaiDate(doc.sent_to_hq_date) : '-'}</td>
+                    <td className="px-4 py-3 text-gray-400">{doc.cost ? `${doc.cost.toLocaleString()} บาท` : '-'}</td>
+                    <td className="px-4 py-3 text-gray-400">{doc.note || '-'}</td>
+                    <td className="px-4 py-3">
+                      {doc.image_urls?.length ? doc.image_urls.map((url, i) => (
+                        <a key={i} href={url} target="_blank" rel="noreferrer" className="text-[#C9922A] text-xs underline block">รูป {i + 1}</a>
+                      )) : '-'}
+                    </td>
+                    <td className="px-4 py-3"><button onClick={() => handleDelete(doc.id)} className="text-red-400 text-xs">ลบ</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden flex flex-col gap-3">
+            {docs.map(doc => (
+              <div key={doc.id} className="bg-[#1a1a1a] border border-[#C9922A]/20 rounded-xl p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-white font-semibold">{doc.sender_name}</span>
+                  <span className="px-2 py-1 rounded-full text-xs bg-[#C9922A]/20 text-[#C9922A]">{doc.department}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-y-1 text-sm mb-2">
+                  <span className="text-gray-500">วันที่รับ</span><span className="text-gray-300">{toThaiDate(doc.received_date)}</span>
+                  <span className="text-gray-500">ส่ง HQ</span><span className="text-gray-300">{doc.sent_to_hq_date ? toThaiDate(doc.sent_to_hq_date) : '-'}</span>
+                  <span className="text-gray-500">ค่าใช้จ่าย</span><span className="text-gray-300">{doc.cost ? `${doc.cost.toLocaleString()} บาท` : '-'}</span>
+                  <span className="text-gray-500">หมายเหตุ</span><span className="text-gray-300">{doc.note || '-'}</span>
+                </div>
+                {doc.image_urls?.length ? (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {doc.image_urls.map((url, i) => (
+                      <a key={i} href={url} target="_blank" rel="noreferrer" className="text-[#C9922A] text-xs underline">รูป {i + 1}</a>
+                    ))}
+                  </div>
+                ) : null}
+                <button onClick={() => handleDelete(doc.id)} className="text-red-400 text-xs">ลบ</button>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   )

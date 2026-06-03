@@ -93,44 +93,69 @@ export default function AgentsPage() {
 
       {loading ? (
         <div className="text-gray-400">กำลังโหลด...</div>
+      ) : agents.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">ยังไม่มีข้อมูลตัวแทน</div>
       ) : (
-        <div className="bg-[#1a1a1a] border border-[#C9922A]/20 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[#333] text-gray-400">
-                <th className="text-left px-4 py-3">ชื่อ</th>
-                <th className="text-left px-4 py-3">รหัส</th>
-                <th className="text-left px-4 py-3">เลขใบอนุญาต</th>
-                <th className="text-left px-4 py-3">เบอร์โทร</th>
-                <th className="text-left px-4 py-3">หมดอายุ (พ.ศ.)</th>
-                <th className="text-left px-4 py-3">สถานะ</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {agents.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-8 text-gray-500">ยังไม่มีข้อมูลตัวแทน</td></tr>
-              ) : agents.map(agent => {
-                const status = expiryStatus(agent.license_expiry)
-                return (
-                  <tr key={agent.id} className="border-b border-[#242424] hover:bg-[#242424]/50">
-                    <td className="px-4 py-3 text-white font-medium">{agent.name}</td>
-                    <td className="px-4 py-3 text-gray-400">{agent.code || '-'}</td>
-                    <td className="px-4 py-3 text-gray-400">{agent.license_number || '-'}</td>
-                    <td className="px-4 py-3 text-gray-400">{agent.phone || '-'}</td>
-                    <td className="px-4 py-3 text-gray-400">{toThaiDate(agent.license_expiry)}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <button onClick={() => handleDelete(agent.id)} className="text-red-400 hover:text-red-300 text-xs">ลบ</button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {/* Desktop table */}
+          <div className="hidden md:block bg-[#1a1a1a] border border-[#C9922A]/20 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#333] text-gray-400">
+                  <th className="text-left px-4 py-3">ชื่อ</th>
+                  <th className="text-left px-4 py-3">รหัส</th>
+                  <th className="text-left px-4 py-3">เลขใบอนุญาต</th>
+                  <th className="text-left px-4 py-3">เบอร์โทร</th>
+                  <th className="text-left px-4 py-3">หมดอายุ (พ.ศ.)</th>
+                  <th className="text-left px-4 py-3">สถานะ</th>
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {agents.map(agent => {
+                  const status = expiryStatus(agent.license_expiry)
+                  return (
+                    <tr key={agent.id} className="border-b border-[#242424] hover:bg-[#242424]/50">
+                      <td className="px-4 py-3 text-white font-medium">{agent.name}</td>
+                      <td className="px-4 py-3 text-gray-400">{agent.code || '-'}</td>
+                      <td className="px-4 py-3 text-gray-400">{agent.license_number || '-'}</td>
+                      <td className="px-4 py-3 text-gray-400">{agent.phone || '-'}</td>
+                      <td className="px-4 py-3 text-gray-400">{toThaiDate(agent.license_expiry)}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button onClick={() => handleDelete(agent.id)} className="text-red-400 text-xs">ลบ</button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden flex flex-col gap-3">
+            {agents.map(agent => {
+              const status = expiryStatus(agent.license_expiry)
+              return (
+                <div key={agent.id} className="bg-[#1a1a1a] border border-[#C9922A]/20 rounded-xl p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-white font-semibold text-base">{agent.name}</span>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-y-1 text-sm">
+                    <span className="text-gray-500">รหัส</span><span className="text-gray-300">{agent.code || '-'}</span>
+                    <span className="text-gray-500">เลขใบอนุญาต</span><span className="text-gray-300">{agent.license_number || '-'}</span>
+                    <span className="text-gray-500">เบอร์โทร</span><span className="text-gray-300">{agent.phone || '-'}</span>
+                    <span className="text-gray-500">หมดอายุ</span><span className="text-gray-300">{toThaiDate(agent.license_expiry)}</span>
+                  </div>
+                  <button onClick={() => handleDelete(agent.id)} className="mt-3 text-red-400 text-xs">ลบ</button>
+                </div>
+              )
+            })}
+          </div>
+        </>
       )}
     </div>
   )
