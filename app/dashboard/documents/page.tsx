@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 type Doc = {
@@ -40,6 +40,9 @@ export default function DocumentsPage() {
   })
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [error, setError] = useState('')
+  const [agentSearch, setAgentSearch] = useState('')
+  const [showAgentList, setShowAgentList] = useState(false)
+  const agentRef = useRef<HTMLDivElement>(null)
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const supabase = createClient()
 
@@ -134,15 +137,38 @@ export default function DocumentsPage() {
 
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-[#1a1a1a] border border-[#C9922A]/30 rounded-xl p-6 mb-6 grid grid-cols-2 gap-4">
-          <div>
+          <div className="relative" ref={agentRef}>
             <label className="text-xs text-gray-400 mb-1 block">ชื่อผู้ส่ง (ตัวแทน)</label>
-            <select required value={form.sender_name} onChange={e => setForm({ ...form, sender_name: e.target.value })}
-              className={`w-full ${inputClass}`}>
-              <option value="">-- เลือกตัวแทน --</option>
-              {agents.map(a => (
-                <option key={a.id} value={a.name}>{a.name}{a.code ? ` (${a.code})` : ''}</option>
-              ))}
-            </select>
+            <input
+              required
+              placeholder="พิมพ์ชื่อหรือรหัสเพื่อค้นหา..."
+              value={agentSearch || form.sender_name}
+              onChange={e => { setAgentSearch(e.target.value); setShowAgentList(true); setForm({ ...form, sender_name: '' }) }}
+              onFocus={() => setShowAgentList(true)}
+              className={`w-full ${inputClass}`}
+              autoComplete="off"
+            />
+            {showAgentList && (
+              <div className="absolute z-50 w-full bg-[#242424] border border-[#C9922A]/40 rounded-lg mt-1 max-h-48 overflow-y-auto shadow-xl">
+                {agents
+                  .filter(a => !agentSearch || a.name.includes(agentSearch) || (a.code && a.code.includes(agentSearch)))
+                  .map(a => (
+                    <div key={a.id}
+                      onMouseDown={() => {
+                        setForm({ ...form, sender_name: a.name })
+                        setAgentSearch('')
+                        setShowAgentList(false)
+                      }}
+                      className="px-4 py-3 text-sm text-white hover:bg-[#C9922A]/20 cursor-pointer border-b border-[#333]">
+                      {a.name}{a.code ? <span className="text-gray-400 ml-2">({a.code})</span> : ''}
+                    </div>
+                  ))}
+                {agents.filter(a => !agentSearch || a.name.includes(agentSearch) || (a.code && a.code.includes(agentSearch))).length === 0 && (
+                  <div className="px-4 py-3 text-sm text-gray-500">ไม่พบตัวแทน</div>
+                )}
+              </div>
+            )}
+            {form.sender_name && <p className="text-xs text-[#C9922A] mt-1">เลือก: {form.sender_name}</p>}
           </div>
           <div>
             <label className="text-xs text-gray-400 mb-1 block">วันที่ส่งมาสาขา</label>
