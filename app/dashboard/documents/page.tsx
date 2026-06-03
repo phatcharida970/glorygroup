@@ -110,7 +110,7 @@ export default function DocumentsPage() {
 
     const { error: insertError } = await supabase.from('gg_documents').insert(rows)
     if (insertError) { setError('บันทึกไม่สำเร็จ: ' + insertError.message); setUploading(false); return }
-    setEntries([newEntry()]); setImageFiles([]); setShowForm(false); setUploading(false)
+    setEntries([newEntry()]); setShowForm(false); setUploading(false)
     fetchDocs()
   }
 
