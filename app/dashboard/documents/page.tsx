@@ -15,6 +15,12 @@ type Doc = {
   created_at: string
 }
 
+type Agent = {
+  id: string
+  name: string
+  code: string
+}
+
 const departments = ['ฝ่ายพิจารณา', 'ฝ่ายสินไหม', 'ฝ่ายบริการ']
 
 function toThaiDate(isoDate: string): string {
@@ -24,6 +30,7 @@ function toThaiDate(isoDate: string): string {
 
 export default function DocumentsPage() {
   const [docs, setDocs] = useState<Doc[]>([])
+  const [agents, setAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -36,7 +43,12 @@ export default function DocumentsPage() {
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const supabase = createClient()
 
-  useEffect(() => { fetchDocs() }, [month])
+  useEffect(() => { fetchDocs(); fetchAgents() }, [month])
+
+  async function fetchAgents() {
+    const { data } = await supabase.from('gg_agents').select('id, name, code').order('name')
+    setAgents(data || [])
+  }
 
   async function fetchDocs() {
     setLoading(true)
@@ -122,7 +134,16 @@ export default function DocumentsPage() {
 
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-[#1a1a1a] border border-[#C9922A]/30 rounded-xl p-6 mb-6 grid grid-cols-2 gap-4">
-          <input required placeholder="ชื่อผู้ส่ง" value={form.sender_name} onChange={e => setForm({ ...form, sender_name: e.target.value })} className={inputClass} />
+          <div>
+            <label className="text-xs text-gray-400 mb-1 block">ชื่อผู้ส่ง (ตัวแทน)</label>
+            <select required value={form.sender_name} onChange={e => setForm({ ...form, sender_name: e.target.value })}
+              className={`w-full ${inputClass}`}>
+              <option value="">-- เลือกตัวแทน --</option>
+              {agents.map(a => (
+                <option key={a.id} value={a.name}>{a.name}{a.code ? ` (${a.code})` : ''}</option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="text-xs text-gray-400 mb-1 block">วันที่ส่งมาสาขา</label>
             <input required type="date" value={form.received_date} onChange={e => setForm({ ...form, received_date: e.target.value })}
