@@ -49,6 +49,8 @@ export default function DocumentsPage() {
   const [showForm, setShowForm] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [entries, setEntries] = useState<Entry[]>([newEntry()])
+  const [formCost, setFormCost] = useState('')
+  const [formPayment, setFormPayment] = useState('')
   const [error, setError] = useState('')
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const supabase = createClient()
@@ -104,8 +106,8 @@ export default function DocumentsPage() {
         department: en.department,
         sent_to_hq_date: en.sent_to_hq_date || null,
         note: en.note || null,
-        cost: en.cost ? parseFloat(en.cost) : null,
-      payment_method: en.payment_method || null,
+        cost: formCost ? parseFloat(formCost) : null,
+      payment_method: formPayment || null,
         image_urls: image_urls.length > 0 ? image_urls : null,
         user_id: user?.id
       }
@@ -113,7 +115,7 @@ export default function DocumentsPage() {
 
     const { error: insertError } = await supabase.from('gg_documents').insert(rows)
     if (insertError) { setError('บันทึกไม่สำเร็จ: ' + insertError.message); setUploading(false); return }
-    setEntries([newEntry()]); setShowForm(false); setUploading(false)
+    setEntries([newEntry()]); setFormCost(''); setFormPayment(''); setShowForm(false); setUploading(false)
     fetchDocs()
   }
 
@@ -212,22 +214,6 @@ export default function DocumentsPage() {
                     <input placeholder="หมายเหตุ" value={en.note} onChange={e => updateEntry(i, { note: e.target.value })} className={inputClass} />
                   </div>
 
-                  {/* ค่าใช้จ่าย + วิธีชำระ */}
-                  <div>
-                    <label className="text-xs text-gray-400 mb-1 block">ค่าใช้จ่าย (บาท)</label>
-                    <input type="number" placeholder="0" value={en.cost}
-                      onChange={e => updateEntry(i, { cost: e.target.value })} className={inputClass} />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400 mb-1 block">วิธีชำระเงิน</label>
-                    <select value={en.payment_method} onChange={e => updateEntry(i, { payment_method: e.target.value })} className={inputClass}>
-                      <option value="">-- เลือกวิธีชำระ --</option>
-                      <option value="เงินสด">เงินสด</option>
-                      <option value="เงินโอน">เงินโอน</option>
-                      <option value="ตัดบัตร">ตัดบัตร</option>
-                    </select>
-                  </div>
-
                   {/* แนบรูปของแต่ละคน */}
                   <div className="md:col-span-2">
                     <label className="text-xs text-gray-400 mb-1 block">แนบรูปภาพ (เลือกได้หลายรูป)</label>
@@ -249,6 +235,24 @@ export default function DocumentsPage() {
               className="flex items-center gap-2 justify-center py-3 border-2 border-dashed border-[#C9922A]/40 rounded-xl text-[#C9922A] hover:border-[#C9922A] hover:bg-[#C9922A]/10 transition-colors text-sm">
               <span className="text-xl leading-none">+</span> เพิ่มรายการถัดไป
             </button>
+          </div>
+
+          {/* ค่าใช้จ่ายรวม - แยกออกจากกรอบ */}
+          <div className="bg-[#1a1a1a] border border-[#C9922A]/20 rounded-xl p-4 mt-2 grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-400 mb-1 block">ค่าใช้จ่ายรวม (บาท)</label>
+              <input type="number" placeholder="0" value={formCost}
+                onChange={e => setFormCost(e.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 mb-1 block">วิธีชำระเงิน</label>
+              <select value={formPayment} onChange={e => setFormPayment(e.target.value)} className={inputClass}>
+                <option value="">-- เลือกวิธีชำระ --</option>
+                <option value="เงินสด">เงินสด</option>
+                <option value="เงินโอน">เงินโอน</option>
+                <option value="ตัดบัตร">ตัดบัตร</option>
+              </select>
+            </div>
           </div>
 
           {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
