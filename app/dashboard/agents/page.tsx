@@ -13,13 +13,6 @@ type Agent = {
   created_at: string
 }
 
-// แปลง พ.ศ. เป็น ค.ศ. สำหรับบันทึก
-function buddhistToISO(day: string, month: string, year: string): string {
-  const ce = parseInt(year) - 543
-  return `${ce}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
-}
-
-// แสดงผลเป็น พ.ศ.
 function toThaiDate(isoDate: string): string {
   const d = new Date(isoDate)
   const day = d.getDate()
@@ -28,16 +21,11 @@ function toThaiDate(isoDate: string): string {
   return `${day}/${month}/${year}`
 }
 
-const thaiMonths = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม']
-
 export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ name: '', code: '', license_number: '', phone: '' })
-  const [expDay, setExpDay] = useState('')
-  const [expMonth, setExpMonth] = useState('1')
-  const [expYear, setExpYear] = useState('')
+  const [form, setForm] = useState({ name: '', code: '', license_number: '', license_expiry: '', phone: '' })
   const supabase = createClient()
 
   useEffect(() => { fetchAgents() }, [])
@@ -50,10 +38,8 @@ export default function AgentsPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const license_expiry = buddhistToISO(expDay, expMonth, expYear)
-    await supabase.from('gg_agents').insert([{ ...form, license_expiry }])
-    setForm({ name: '', code: '', license_number: '', phone: '' })
-    setExpDay(''); setExpMonth('1'); setExpYear('')
+    await supabase.from('gg_agents').insert([form])
+    setForm({ name: '', code: '', license_number: '', license_expiry: '', phone: '' })
     setShowForm(false)
     fetchAgents()
   }
@@ -89,20 +75,15 @@ export default function AgentsPage() {
           <input placeholder="รหัสตัวแทน" value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} className={inputClass} />
           <input placeholder="เลขที่ใบอนุญาต" value={form.license_number} onChange={e => setForm({ ...form, license_number: e.target.value })} className={inputClass} />
           <input placeholder="เบอร์โทร" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className={inputClass} />
-          <div className="col-span-2">
-            <label className="text-xs text-gray-400 mb-2 block">วันหมดอายุใบอนุญาต (พ.ศ.)</label>
-            <div className="flex gap-2">
-              <input required type="number" placeholder="วัน" min="1" max="31" value={expDay} onChange={e => setExpDay(e.target.value)}
-                className={`w-20 ${inputClass}`} />
-              <select value={expMonth} onChange={e => setExpMonth(e.target.value)}
-                className={`flex-1 ${inputClass}`}>
-                {thaiMonths.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-              </select>
-              <input required type="number" placeholder="ปี พ.ศ." min="2500" max="2600" value={expYear} onChange={e => setExpYear(e.target.value)}
-                className={`w-28 ${inputClass}`} />
-            </div>
+          <div>
+            <label className="text-xs text-gray-400 mb-1 block">วันหมดอายุใบอนุญาต</label>
+            <input required type="date" value={form.license_expiry} onChange={e => setForm({ ...form, license_expiry: e.target.value })}
+              className="w-full px-3 py-2 rounded-lg bg-[#242424] border border-[#333] text-white focus:outline-none focus:border-[#C9922A]" />
+            {form.license_expiry && (
+              <p className="text-xs text-[#C9922A] mt-1">พ.ศ. {new Date(form.license_expiry).getFullYear() + 543}</p>
+            )}
           </div>
-          <div className="col-span-2 flex gap-2">
+          <div className="flex gap-2">
             <button type="submit" className="flex-1 py-2 bg-[#C9922A] text-black rounded-lg font-semibold text-sm">บันทึก</button>
             <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2 bg-[#242424] text-gray-400 rounded-lg text-sm">ยกเลิก</button>
           </div>
