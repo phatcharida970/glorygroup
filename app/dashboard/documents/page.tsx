@@ -27,6 +27,8 @@ type Entry = {
   agentSearch: string
   showAgentList: boolean
   imageFiles: File[]
+  cost: string
+  payment_method: string
 }
 
 const departments = ['ฝ่ายพิจารณา', 'ฝ่ายสินไหม', 'ฝ่ายบริการ']
@@ -37,7 +39,7 @@ function toThaiDate(isoDate: string): string {
 }
 
 function newEntry(): Entry {
-  return { sender_name: '', received_date: '', department: departments[0], sent_to_hq_date: '', note: '', agentSearch: '', showAgentList: false, imageFiles: [] }
+  return { sender_name: '', received_date: '', department: departments[0], sent_to_hq_date: '', note: '', agentSearch: '', showAgentList: false, imageFiles: [], cost: '', payment_method: '' }
 }
 
 export default function DocumentsPage() {
@@ -102,7 +104,8 @@ export default function DocumentsPage() {
         department: en.department,
         sent_to_hq_date: en.sent_to_hq_date || null,
         note: en.note || null,
-        cost: null,
+        cost: en.cost ? parseFloat(en.cost) : null,
+      payment_method: en.payment_method || null,
         image_urls: image_urls.length > 0 ? image_urls : null,
         user_id: user?.id
       }
@@ -209,6 +212,22 @@ export default function DocumentsPage() {
                     <input placeholder="หมายเหตุ" value={en.note} onChange={e => updateEntry(i, { note: e.target.value })} className={inputClass} />
                   </div>
 
+                  {/* ค่าใช้จ่าย + วิธีชำระ */}
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">ค่าใช้จ่าย (บาท)</label>
+                    <input type="number" placeholder="0" value={en.cost}
+                      onChange={e => updateEntry(i, { cost: e.target.value })} className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">วิธีชำระเงิน</label>
+                    <select value={en.payment_method} onChange={e => updateEntry(i, { payment_method: e.target.value })} className={inputClass}>
+                      <option value="">-- เลือกวิธีชำระ --</option>
+                      <option value="เงินสด">เงินสด</option>
+                      <option value="เงินโอน">เงินโอน</option>
+                      <option value="ตัดบัตร">ตัดบัตร</option>
+                    </select>
+                  </div>
+
                   {/* แนบรูปของแต่ละคน */}
                   <div className="md:col-span-2">
                     <label className="text-xs text-gray-400 mb-1 block">แนบรูปภาพ (เลือกได้หลายรูป)</label>
@@ -255,6 +274,8 @@ export default function DocumentsPage() {
                   <th className="text-left px-4 py-3">วันที่รับ</th>
                   <th className="text-left px-4 py-3">ฝ่าย</th>
                   <th className="text-left px-4 py-3">ส่ง HQ</th>
+                  <th className="text-left px-4 py-3">ค่าใช้จ่าย</th>
+                  <th className="text-left px-4 py-3">วิธีชำระ</th>
                   <th className="text-left px-4 py-3">หมายเหตุ</th>
                   <th className="px-4 py-3">รูป</th>
                   <th className="px-4 py-3"></th>
@@ -267,6 +288,8 @@ export default function DocumentsPage() {
                     <td className="px-4 py-3 text-gray-400">{toThaiDate(doc.received_date)}</td>
                     <td className="px-4 py-3"><span className="px-2 py-1 rounded-full text-xs bg-[#C9922A]/20 text-[#C9922A]">{doc.department}</span></td>
                     <td className="px-4 py-3 text-gray-400">{doc.sent_to_hq_date ? toThaiDate(doc.sent_to_hq_date) : '-'}</td>
+                    <td className="px-4 py-3 text-gray-400">{doc.cost ? `${doc.cost.toLocaleString()} บาท` : '-'}</td>
+                    <td className="px-4 py-3 text-gray-400">{(doc as any).payment_method || '-'}</td>
                     <td className="px-4 py-3 text-gray-400">{doc.note || '-'}</td>
                     <td className="px-4 py-3">
                       {doc.image_urls?.length ? doc.image_urls.map((url, i) => (
