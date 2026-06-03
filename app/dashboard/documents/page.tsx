@@ -11,11 +11,16 @@ type Doc = {
   sent_to_hq_date: string | null
   cost: number | null
   note: string | null
-  image_url: string | null
+  image_urls: string[] | null
   created_at: string
 }
 
 const departments = ['ฝ่ายพิจารณา', 'ฝ่ายสินไหม', 'ฝ่ายบริการ']
+
+function toThaiDate(isoDate: string): string {
+  const d = new Date(isoDate)
+  return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear() + 543}`
+}
 
 export default function DocumentsPage() {
   const [docs, setDocs] = useState<Doc[]>([])
@@ -26,7 +31,7 @@ export default function DocumentsPage() {
     sender_name: '', received_date: '', department: departments[0],
     sent_to_hq_date: '', cost: '', note: ''
   })
-  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imageFiles, setImageFiles] = useState<File[]>([])
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const supabase = createClient()
 
@@ -47,22 +52,26 @@ export default function DocumentsPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setUploading(true)
-    let image_url = null
-    if (imageFile) {
-      const ext = imageFile.name.split('.').pop()
-      const path = `documents/${Date.now()}.${ext}`
-      await supabase.storage.from('attachments').upload(path, imageFile)
+    const { data: { user } } = await supabase.auth.getUser()
+
+    const image_urls: string[] = []
+    for (const file of imageFiles) {
+      const ext = file.name.split('.').pop()
+      const path = `documents/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+      await supabase.storage.from('attachments').upload(path, file)
       const { data } = supabase.storage.from('attachments').getPublicUrl(path)
-      image_url = data.publicUrl
+      image_urls.push(data.publicUrl)
     }
+
     await supabase.from('gg_documents').insert([{
       ...form,
       cost: form.cost ? parseFloat(form.cost) : null,
       sent_to_hq_date: form.sent_to_hq_date || null,
-      image_url
+      image_urls: image_urls.length > 0 ? image_urls : null,
+      user_id: user?.id
     }])
     setForm({ sender_name: '', received_date: '', department: departments[0], sent_to_hq_date: '', cost: '', note: '' })
-    setImageFile(null)
+    setImageFiles([])
     setShowForm(false)
     setUploading(false)
     fetchDocs()
@@ -75,6 +84,7 @@ export default function DocumentsPage() {
   }
 
   const totalCost = docs.reduce((sum, d) => sum + (d.cost || 0), 0)
+  const inputClass = "px-3 py-2 rounded-lg bg-[#242424] border border-[#333] text-white placeholder-gray-500 focus:outline-none focus:border-[#C9922A]"
 
   return (
     <div>
@@ -86,7 +96,6 @@ export default function DocumentsPage() {
         </button>
       </div>
 
-      {/* Filter month */}
       <div className="flex items-center gap-3 mb-6">
         <label className="text-gray-400 text-sm">เดือน:</label>
         <input type="month" value={month} onChange={e => setMonth(e.target.value)}
@@ -99,33 +108,39 @@ export default function DocumentsPage() {
 
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-[#1a1a1a] border border-[#C9922A]/30 rounded-xl p-6 mb-6 grid grid-cols-2 gap-4">
-          <input required placeholder="ชื่อผู้ส่ง" value={form.sender_name} onChange={e => setForm({ ...form, sender_name: e.target.value })}
-            className="px-3 py-2 rounded-lg bg-[#242424] border border-[#333] text-white placeholder-gray-500 focus:outline-none focus:border-[#C9922A]" />
+          <input required placeholder="ชื่อผู้ส่ง" value={form.sender_name} onChange={e => setForm({ ...form, sender_name: e.target.value })} className={inputClass} />
           <div>
             <label className="text-xs text-gray-400 mb-1 block">วันที่ส่งมาสาขา</label>
             <input required type="date" value={form.received_date} onChange={e => setForm({ ...form, received_date: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg bg-[#242424] border border-[#333] text-white focus:outline-none focus:border-[#C9922A]" />
+              className={`w-full ${inputClass}`} />
+            {form.received_date && <p className="text-xs text-[#C9922A] mt-1">พ.ศ. {new Date(form.received_date).getFullYear() + 543}</p>}
           </div>
           <div>
             <label className="text-xs text-gray-400 mb-1 block">ส่งไปฝ่าย</label>
-            <select value={form.department} onChange={e => setForm({ ...form, department: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg bg-[#242424] border border-[#333] text-white focus:outline-none focus:border-[#C9922A]">
+            <select value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} className={`w-full ${inputClass}`}>
               {departments.map(d => <option key={d}>{d}</option>)}
             </select>
           </div>
           <div>
             <label className="text-xs text-gray-400 mb-1 block">วันที่ส่งสำนักงานใหญ่</label>
             <input type="date" value={form.sent_to_hq_date} onChange={e => setForm({ ...form, sent_to_hq_date: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg bg-[#242424] border border-[#333] text-white focus:outline-none focus:border-[#C9922A]" />
+              className={`w-full ${inputClass}`} />
+            {form.sent_to_hq_date && <p className="text-xs text-[#C9922A] mt-1">พ.ศ. {new Date(form.sent_to_hq_date).getFullYear() + 543}</p>}
           </div>
-          <input type="number" placeholder="ค่าใช้จ่าย (บาท)" value={form.cost} onChange={e => setForm({ ...form, cost: e.target.value })}
-            className="px-3 py-2 rounded-lg bg-[#242424] border border-[#333] text-white placeholder-gray-500 focus:outline-none focus:border-[#C9922A]" />
-          <input placeholder="หมายเหตุ" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })}
-            className="px-3 py-2 rounded-lg bg-[#242424] border border-[#333] text-white placeholder-gray-500 focus:outline-none focus:border-[#C9922A]" />
+          <input type="number" placeholder="ค่าใช้จ่าย (บาท)" value={form.cost} onChange={e => setForm({ ...form, cost: e.target.value })} className={inputClass} />
+          <input placeholder="หมายเหตุ" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} className={inputClass} />
           <div className="col-span-2">
-            <label className="text-xs text-gray-400 mb-1 block">แนบรูปภาพ</label>
-            <input type="file" accept="image/*" onChange={e => setImageFile(e.target.files?.[0] || null)}
+            <label className="text-xs text-gray-400 mb-1 block">แนบรูปภาพ (เลือกได้หลายรูป)</label>
+            <input type="file" accept="image/*" multiple
+              onChange={e => setImageFiles(Array.from(e.target.files || []))}
               className="text-sm text-gray-400" />
+            {imageFiles.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {imageFiles.map((f, i) => (
+                  <span key={i} className="text-xs bg-[#242424] text-gray-300 px-2 py-1 rounded">{f.name}</span>
+                ))}
+              </div>
+            )}
           </div>
           <div className="col-span-2 flex gap-2">
             <button type="submit" disabled={uploading} className="flex-1 py-2 bg-[#C9922A] text-black rounded-lg font-semibold text-sm disabled:opacity-50">
@@ -142,9 +157,9 @@ export default function DocumentsPage() {
             <thead>
               <tr className="border-b border-[#333] text-gray-400">
                 <th className="text-left px-4 py-3">ผู้ส่ง</th>
-                <th className="text-left px-4 py-3">วันที่รับ</th>
+                <th className="text-left px-4 py-3">วันที่รับ (พ.ศ.)</th>
                 <th className="text-left px-4 py-3">ฝ่าย</th>
-                <th className="text-left px-4 py-3">ส่ง HQ</th>
+                <th className="text-left px-4 py-3">ส่ง HQ (พ.ศ.)</th>
                 <th className="text-left px-4 py-3">ค่าใช้จ่าย</th>
                 <th className="text-left px-4 py-3">หมายเหตุ</th>
                 <th className="px-4 py-3">รูป</th>
@@ -157,16 +172,20 @@ export default function DocumentsPage() {
               ) : docs.map(doc => (
                 <tr key={doc.id} className="border-b border-[#242424] hover:bg-[#242424]/50">
                   <td className="px-4 py-3 text-white">{doc.sender_name}</td>
-                  <td className="px-4 py-3 text-gray-400">{new Date(doc.received_date).toLocaleDateString('th-TH')}</td>
+                  <td className="px-4 py-3 text-gray-400">{toThaiDate(doc.received_date)}</td>
                   <td className="px-4 py-3">
                     <span className="px-2 py-1 rounded-full text-xs bg-[#C9922A]/20 text-[#C9922A]">{doc.department}</span>
                   </td>
-                  <td className="px-4 py-3 text-gray-400">{doc.sent_to_hq_date ? new Date(doc.sent_to_hq_date).toLocaleDateString('th-TH') : '-'}</td>
+                  <td className="px-4 py-3 text-gray-400">{doc.sent_to_hq_date ? toThaiDate(doc.sent_to_hq_date) : '-'}</td>
                   <td className="px-4 py-3 text-gray-400">{doc.cost ? `${doc.cost.toLocaleString()} บาท` : '-'}</td>
                   <td className="px-4 py-3 text-gray-400">{doc.note || '-'}</td>
                   <td className="px-4 py-3">
-                    {doc.image_url ? (
-                      <a href={doc.image_url} target="_blank" rel="noreferrer" className="text-[#C9922A] text-xs underline">ดูรูป</a>
+                    {doc.image_urls && doc.image_urls.length > 0 ? (
+                      <div className="flex flex-col gap-1">
+                        {doc.image_urls.map((url, i) => (
+                          <a key={i} href={url} target="_blank" rel="noreferrer" className="text-[#C9922A] text-xs underline">รูป {i + 1}</a>
+                        ))}
+                      </div>
                     ) : '-'}
                   </td>
                   <td className="px-4 py-3">
