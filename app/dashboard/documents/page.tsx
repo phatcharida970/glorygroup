@@ -155,7 +155,8 @@ export default function DocumentsPage() {
                   .map(a => (
                     <div key={a.id}
                       onMouseDown={() => {
-                        setForm({ ...form, sender_name: a.name })
+                        const label = a.code ? `${a.name} (${a.code})` : a.name
+                        setForm({ ...form, sender_name: label })
                         setAgentSearch('')
                         setShowAgentList(false)
                       }}
