@@ -38,7 +38,8 @@ export default function AgentsPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    await supabase.from('gg_agents').insert([form])
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('gg_agents').insert([{ ...form, user_id: user?.id }])
     setForm({ name: '', code: '', license_number: '', license_expiry: '', phone: '' })
     setShowForm(false)
     fetchAgents()
