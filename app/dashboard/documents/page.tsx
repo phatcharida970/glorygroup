@@ -40,12 +40,13 @@ export default function DocumentsPage() {
 
   async function fetchDocs() {
     setLoading(true)
-    const { data } = await supabase
+    const { data, error: fetchError } = await supabase
       .from('gg_documents')
       .select('*')
       .gte('received_date', `${month}-01`)
       .lte('received_date', `${month}-31`)
       .order('received_date', { ascending: false })
+    if (fetchError) setError('โหลดข้อมูลไม่ได้: ' + fetchError.message)
     setDocs(data || [])
     setLoading(false)
   }
