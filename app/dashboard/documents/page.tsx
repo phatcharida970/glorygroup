@@ -63,10 +63,12 @@ export default function DocumentsPage() {
     for (const file of imageFiles) {
       try {
         const ext = file.name.split('.').pop()
-        const path = `documents/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-        await supabase.storage.from('attachments').upload(path, file)
-        const { data } = supabase.storage.from('attachments').getPublicUrl(path)
-        image_urls.push(data.publicUrl)
+        const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+        const { error: uploadError } = await supabase.storage.from('attachments').upload(fileName, file, { upsert: true })
+        if (!uploadError) {
+          const { data } = supabase.storage.from('attachments').getPublicUrl(fileName)
+          image_urls.push(data.publicUrl)
+        }
       } catch {}
     }
 
