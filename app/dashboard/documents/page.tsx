@@ -32,6 +32,7 @@ export default function DocumentsPage() {
     sent_to_hq_date: '', cost: '', note: ''
   })
   const [imageFiles, setImageFiles] = useState<File[]>([])
+  const [error, setError] = useState('')
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const supabase = createClient()
 
@@ -52,24 +53,32 @@ export default function DocumentsPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setUploading(true)
+    setError('')
     const { data: { user } } = await supabase.auth.getUser()
 
     const image_urls: string[] = []
     for (const file of imageFiles) {
-      const ext = file.name.split('.').pop()
-      const path = `documents/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-      await supabase.storage.from('attachments').upload(path, file)
-      const { data } = supabase.storage.from('attachments').getPublicUrl(path)
-      image_urls.push(data.publicUrl)
+      try {
+        const ext = file.name.split('.').pop()
+        const path = `documents/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+        await supabase.storage.from('attachments').upload(path, file)
+        const { data } = supabase.storage.from('attachments').getPublicUrl(path)
+        image_urls.push(data.publicUrl)
+      } catch {}
     }
 
-    await supabase.from('gg_documents').insert([{
+    const { error: insertError } = await supabase.from('gg_documents').insert([{
       ...form,
       cost: form.cost ? parseFloat(form.cost) : null,
       sent_to_hq_date: form.sent_to_hq_date || null,
       image_urls: image_urls.length > 0 ? image_urls : null,
       user_id: user?.id
     }])
+    if (insertError) {
+      setError('บันทึกไม่สำเร็จ: ' + insertError.message)
+      setUploading(false)
+      return
+    }
     setForm({ sender_name: '', received_date: '', department: departments[0], sent_to_hq_date: '', cost: '', note: '' })
     setImageFiles([])
     setShowForm(false)
@@ -142,6 +151,7 @@ export default function DocumentsPage() {
               </div>
             )}
           </div>
+          {error && <p className="col-span-2 text-red-400 text-sm">{error}</p>}
           <div className="col-span-2 flex gap-2">
             <button type="submit" disabled={uploading} className="flex-1 py-2 bg-[#C9922A] text-black rounded-lg font-semibold text-sm disabled:opacity-50">
               {uploading ? 'กำลังบันทึก...' : 'บันทึก'}
