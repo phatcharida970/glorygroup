@@ -16,17 +16,62 @@ type Doc = {
   created_at: string
 }
 
-type Agent = {
-  id: string
-  name: string
-  code: string
-}
+type Agent = { id: string; name: string; code: string }
 
 const departments = ['ฝ่ายพิจารณา', 'ฝ่ายสินไหม', 'ฝ่ายบริการ']
 
 function toThaiDate(isoDate: string): string {
   const d = new Date(isoDate)
   return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear() + 543}`
+}
+
+function SenderField({ agents, value, onChange, onRemove, showRemove }: {
+  agents: Agent[], value: string, onChange: (v: string) => void, onRemove: () => void, showRemove: boolean
+}) {
+  const [search, setSearch] = useState('')
+  const [show, setShow] = useState(false)
+  const inputClass = "w-full px-3 py-2 rounded-lg bg-[#242424] border border-[#333] text-white placeholder-gray-500 focus:outline-none focus:border-[#C9922A]"
+  const filtered = agents.filter(a => !search || a.name.includes(search) || (a.code && a.code.includes(search)))
+
+  return (
+    <div className="flex gap-2 items-start">
+      <div className="flex-1 relative">
+        {value ? (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#C9922A]/10 border border-[#C9922A]/40">
+            <span className="text-white text-sm flex-1">{value}</span>
+            <button type="button" onClick={() => onChange('')} className="text-gray-400 hover:text-red-400 text-xs">✕</button>
+          </div>
+        ) : (
+          <>
+            <input placeholder="พิมพ์ชื่อหรือรหัสเพื่อค้นหา..."
+              value={search}
+              onChange={e => { setSearch(e.target.value); setShow(true) }}
+              onFocus={() => setShow(true)}
+              className={inputClass} autoComplete="off" />
+            {show && (
+              <div className="absolute z-50 w-full bg-[#242424] border border-[#C9922A]/40 rounded-lg mt-1 max-h-48 overflow-y-auto shadow-xl">
+                {filtered.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-gray-500">ไม่พบตัวแทน</div>
+                ) : filtered.map(a => (
+                  <div key={a.id}
+                    onMouseDown={() => {
+                      onChange(a.code ? `${a.name} (${a.code})` : a.name)
+                      setSearch(''); setShow(false)
+                    }}
+                    className="px-4 py-3 text-sm text-white hover:bg-[#C9922A]/20 cursor-pointer border-b border-[#333]">
+                    {a.name}{a.code ? <span className="text-gray-400 ml-2">({a.code})</span> : ''}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+      {showRemove && (
+        <button type="button" onClick={onRemove} className="text-red-400 hover:text-red-300 px-2 py-2 text-lg leading-none">−</button>
+      )}
+    </div>
+  )
 }
 
 export default function DocumentsPage() {
@@ -36,14 +81,12 @@ export default function DocumentsPage() {
   const [showForm, setShowForm] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [form, setForm] = useState({
-    sender_name: '', received_date: '', department: departments[0],
-    sent_to_hq_date: '', cost: '', note: ''
+    received_date: '', department: departments[0],
+    sent_to_hq_date: '', note: ''
   })
+  const [senders, setSenders] = useState<string[]>([''])
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [error, setError] = useState('')
-  const [agentSearch, setAgentSearch] = useState('')
-  const [showAgentList, setShowAgentList] = useState(false)
-  const agentRef = useRef<HTMLDivElement>(null)
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const supabase = createClient()
 
@@ -59,8 +102,7 @@ export default function DocumentsPage() {
     const [y, m] = month.split('-')
     const lastDay = new Date(parseInt(y), parseInt(m), 0).getDate()
     const { data, error: fetchError } = await supabase
-      .from('gg_documents')
-      .select('*')
+      .from('gg_documents').select('*')
       .gte('received_date', `${month}-01`)
       .lte('received_date', `${month}-${lastDay}`)
       .order('received_date', { ascending: false })
@@ -71,8 +113,9 @@ export default function DocumentsPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setUploading(true)
-    setError('')
+    const validSenders = senders.filter(s => s.trim())
+    if (validSenders.length === 0) { setError('กรุณาเลือกผู้ส่งอย่างน้อย 1 คน'); return }
+    setUploading(true); setError('')
     const { data: { user } } = await supabase.auth.getUser()
 
     const image_urls: string[] = []
@@ -90,21 +133,15 @@ export default function DocumentsPage() {
 
     const { error: insertError } = await supabase.from('gg_documents').insert([{
       ...form,
-      cost: form.cost ? parseFloat(form.cost) : null,
+      sender_names: validSenders,
+      sender_name: validSenders[0],
+      cost: null,
       sent_to_hq_date: form.sent_to_hq_date || null,
       image_urls: image_urls.length > 0 ? image_urls : null,
       user_id: user?.id
     }])
-    if (insertError) {
-      setError('บันทึกไม่สำเร็จ: ' + insertError.message)
-      setUploading(false)
-      return
-    }
-    // เคลียร์แค่ผู้ส่งกับรูป แต่คงข้อมูลอื่นไว้เพื่อเพิ่มคนถัดไปได้เร็ว
-    setForm(f => ({ ...f, sender_name: '' }))
-    setAgentSearch('')
-    setImageFiles([])
-    setUploading(false)
+    if (insertError) { setError('บันทึกไม่สำเร็จ: ' + insertError.message); setUploading(false); return }
+    setSenders(['']); setImageFiles([]); setShowForm(false); setUploading(false)
     fetchDocs()
   }
 
@@ -116,7 +153,6 @@ export default function DocumentsPage() {
 
   const totalCost = docs.reduce((sum, d) => sum + (d.cost || 0), 0)
   const inputClass = "px-3 py-2 rounded-lg bg-[#242424] border border-[#333] text-white placeholder-gray-500 focus:outline-none focus:border-[#C9922A]"
-  const filteredAgents = agents.filter(a => !agentSearch || a.name.includes(agentSearch) || (a.code && a.code.includes(agentSearch)))
 
   return (
     <div>
@@ -133,40 +169,30 @@ export default function DocumentsPage() {
         <input type="month" value={month} onChange={e => setMonth(e.target.value)}
           className="px-3 py-2 rounded-lg bg-[#1a1a1a] border border-[#333] text-white focus:outline-none focus:border-[#C9922A]" />
         <div className="ml-auto text-sm text-gray-400">
-          รวม <span className="text-white font-semibold">{docs.length}</span> รอบ |
-          ค่าใช้จ่าย <span className="text-[#C9922A] font-semibold">{totalCost.toLocaleString()} บาท</span>
+          รวม <span className="text-white font-semibold">{docs.length}</span> รอบ
         </div>
       </div>
 
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-[#1a1a1a] border border-[#C9922A]/30 rounded-xl p-6 mb-6 grid grid-cols-2 gap-4">
-          <div className="relative" ref={agentRef}>
-            <label className="text-xs text-gray-400 mb-1 block">ชื่อผู้ส่ง (ตัวแทน)</label>
-            <input required placeholder="พิมพ์ชื่อหรือรหัสเพื่อค้นหา..."
-              value={agentSearch || form.sender_name}
-              onChange={e => { setAgentSearch(e.target.value); setShowAgentList(true); setForm({ ...form, sender_name: '' }) }}
-              onFocus={() => setShowAgentList(true)}
-              className={`w-full ${inputClass}`} autoComplete="off" />
-            {showAgentList && (
-              <div className="absolute z-50 w-full bg-[#242424] border border-[#C9922A]/40 rounded-lg mt-1 max-h-48 overflow-y-auto shadow-xl">
-                {filteredAgents.length === 0 ? (
-                  <div className="px-4 py-3 text-sm text-gray-500">ไม่พบตัวแทน</div>
-                ) : filteredAgents.map(a => (
-                  <div key={a.id}
-                    onMouseDown={() => {
-                      const label = a.code ? `${a.name} (${a.code})` : a.name
-                      setForm({ ...form, sender_name: label })
-                      setAgentSearch('')
-                      setShowAgentList(false)
-                    }}
-                    className="px-4 py-3 text-sm text-white hover:bg-[#C9922A]/20 cursor-pointer border-b border-[#333]">
-                    {a.name}{a.code ? <span className="text-gray-400 ml-2">({a.code})</span> : ''}
-                  </div>
-                ))}
-              </div>
-            )}
-            {form.sender_name && <p className="text-xs text-[#C9922A] mt-1">เลือก: {form.sender_name}</p>}
+
+          {/* ผู้ส่ง หลายคน */}
+          <div className="col-span-2">
+            <label className="text-xs text-gray-400 mb-2 block">ผู้ส่งเอกสาร</label>
+            <div className="flex flex-col gap-2">
+              {senders.map((s, i) => (
+                <SenderField key={i} agents={agents} value={s}
+                  onChange={v => setSenders(senders.map((x, j) => j === i ? v : x))}
+                  onRemove={() => setSenders(senders.filter((_, j) => j !== i))}
+                  showRemove={senders.length > 1} />
+              ))}
+              <button type="button" onClick={() => setSenders([...senders, ''])}
+                className="flex items-center gap-1 text-[#C9922A] text-sm hover:underline mt-1 w-fit">
+                <span className="text-lg leading-none">+</span> เพิ่มผู้ส่ง
+              </button>
+            </div>
           </div>
+
           <div>
             <label className="text-xs text-gray-400 mb-1 block">วันที่ส่งมาสาขา</label>
             <input required type="date" value={form.received_date} onChange={e => setForm({ ...form, received_date: e.target.value })}
@@ -185,7 +211,6 @@ export default function DocumentsPage() {
               className={`w-full ${inputClass}`} />
             {form.sent_to_hq_date && <p className="text-xs text-[#C9922A] mt-1">พ.ศ. {new Date(form.sent_to_hq_date).getFullYear() + 543}</p>}
           </div>
-          <input type="number" placeholder="ค่าใช้จ่าย (บาท)" value={form.cost} onChange={e => setForm({ ...form, cost: e.target.value })} className={inputClass} />
           <input placeholder="หมายเหตุ" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} className={inputClass} />
           <div className="col-span-2">
             <label className="text-xs text-gray-400 mb-1 block">แนบรูปภาพ (เลือกได้หลายรูป)</label>
@@ -201,7 +226,7 @@ export default function DocumentsPage() {
             <button type="submit" disabled={uploading} className="flex-1 py-2 bg-[#C9922A] text-black rounded-lg font-semibold text-sm disabled:opacity-50">
               {uploading ? 'กำลังบันทึก...' : 'บันทึก'}
             </button>
-            <button type="button" onClick={() => { setShowForm(false); setForm({ sender_name: '', received_date: '', department: departments[0], sent_to_hq_date: '', cost: '', note: '' }) }}
+            <button type="button" onClick={() => { setShowForm(false); setSenders(['']); setForm({ received_date: '', department: departments[0], sent_to_hq_date: '', note: '' }) }}
               className="flex-1 py-2 bg-[#242424] text-gray-400 rounded-lg text-sm">ยกเลิก</button>
           </div>
         </form>
@@ -211,7 +236,8 @@ export default function DocumentsPage() {
         <div className="text-center py-8 text-gray-500">ยังไม่มีข้อมูลเดือนนี้</div>
       ) : (
         <>
-          <div className="hidden md:block bg-[#1a1a1a] border border-[#C9922A]/20 rounded-xl overflow-hidden">
+          {/* Desktop table */}
+          <div className="hidden md:block bg-[#1a1a1a] border border-[#C9922A]/20 rounded-xl overflow-hidden mb-4">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#333] text-gray-400">
@@ -219,7 +245,6 @@ export default function DocumentsPage() {
                   <th className="text-left px-4 py-3">วันที่รับ</th>
                   <th className="text-left px-4 py-3">ฝ่าย</th>
                   <th className="text-left px-4 py-3">ส่ง HQ</th>
-                  <th className="text-left px-4 py-3">ค่าใช้จ่าย</th>
                   <th className="text-left px-4 py-3">หมายเหตุ</th>
                   <th className="px-4 py-3">รูป</th>
                   <th className="px-4 py-3"></th>
@@ -228,11 +253,12 @@ export default function DocumentsPage() {
               <tbody>
                 {docs.map(doc => (
                   <tr key={doc.id} className="border-b border-[#242424] hover:bg-[#242424]/50">
-                    <td className="px-4 py-3 text-white">{doc.sender_name || (doc.sender_names?.join(', ')) || '-'}</td>
+                    <td className="px-4 py-3 text-white">
+                      {doc.sender_names?.length ? doc.sender_names.map((s, i) => <div key={i}>{s}</div>) : doc.sender_name || '-'}
+                    </td>
                     <td className="px-4 py-3 text-gray-400">{toThaiDate(doc.received_date)}</td>
                     <td className="px-4 py-3"><span className="px-2 py-1 rounded-full text-xs bg-[#C9922A]/20 text-[#C9922A]">{doc.department}</span></td>
                     <td className="px-4 py-3 text-gray-400">{doc.sent_to_hq_date ? toThaiDate(doc.sent_to_hq_date) : '-'}</td>
-                    <td className="px-4 py-3 text-gray-400">{doc.cost ? `${doc.cost.toLocaleString()} บาท` : '-'}</td>
                     <td className="px-4 py-3 text-gray-400">{doc.note || '-'}</td>
                     <td className="px-4 py-3">
                       {doc.image_urls?.length ? doc.image_urls.map((url, i) => (
@@ -246,17 +272,19 @@ export default function DocumentsPage() {
             </table>
           </div>
 
-          <div className="md:hidden flex flex-col gap-3">
+          {/* Mobile cards */}
+          <div className="md:hidden flex flex-col gap-3 mb-4">
             {docs.map(doc => (
               <div key={doc.id} className="bg-[#1a1a1a] border border-[#C9922A]/20 rounded-xl p-4">
                 <div className="flex justify-between items-start mb-2">
-                  <span className="text-white font-semibold">{doc.sender_name || (doc.sender_names?.join(', ')) || '-'}</span>
+                  <div className="text-white font-semibold text-sm">
+                    {doc.sender_names?.length ? doc.sender_names.map((s, i) => <div key={i}>{s}</div>) : doc.sender_name || '-'}
+                  </div>
                   <span className="px-2 py-1 rounded-full text-xs bg-[#C9922A]/20 text-[#C9922A]">{doc.department}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-y-1 text-sm mb-2">
                   <span className="text-gray-500">วันที่รับ</span><span className="text-gray-300">{toThaiDate(doc.received_date)}</span>
                   <span className="text-gray-500">ส่ง HQ</span><span className="text-gray-300">{doc.sent_to_hq_date ? toThaiDate(doc.sent_to_hq_date) : '-'}</span>
-                  <span className="text-gray-500">ค่าใช้จ่าย</span><span className="text-gray-300">{doc.cost ? `${doc.cost.toLocaleString()} บาท` : '-'}</span>
                   <span className="text-gray-500">หมายเหตุ</span><span className="text-gray-300">{doc.note || '-'}</span>
                 </div>
                 {doc.image_urls?.length ? (
@@ -269,6 +297,19 @@ export default function DocumentsPage() {
                 <button onClick={() => handleDelete(doc.id)} className="text-red-400 text-xs">ลบ</button>
               </div>
             ))}
+          </div>
+
+          {/* สรุปค่าใช้จ่าย */}
+          <div className="bg-[#1a1a1a] border border-[#C9922A]/30 rounded-xl p-5">
+            <h3 className="text-[#C9922A] font-semibold mb-3">สรุปค่าใช้จ่ายประจำเดือน</h3>
+            <div className="flex items-center justify-between">
+              <span className="text-gray-400 text-sm">จำนวนรอบที่ส่ง</span>
+              <span className="text-white font-semibold">{docs.length} รอบ</span>
+            </div>
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-gray-400 text-sm">ค่าใช้จ่ายรวม</span>
+              <span className="text-[#C9922A] font-bold text-lg">{totalCost.toLocaleString()} บาท</span>
+            </div>
           </div>
         </>
       )}
