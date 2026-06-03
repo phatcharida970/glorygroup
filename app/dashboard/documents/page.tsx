@@ -26,6 +26,7 @@ type Entry = {
   note: string
   agentSearch: string
   showAgentList: boolean
+  imageFiles: File[]
 }
 
 const departments = ['ฝ่ายพิจารณา', 'ฝ่ายสินไหม', 'ฝ่ายบริการ']
@@ -36,7 +37,7 @@ function toThaiDate(isoDate: string): string {
 }
 
 function newEntry(): Entry {
-  return { sender_name: '', received_date: '', department: departments[0], sent_to_hq_date: '', note: '', agentSearch: '', showAgentList: false }
+  return { sender_name: '', received_date: '', department: departments[0], sent_to_hq_date: '', note: '', agentSearch: '', showAgentList: false, imageFiles: [] }
 }
 
 export default function DocumentsPage() {
@@ -46,7 +47,6 @@ export default function DocumentsPage() {
   const [showForm, setShowForm] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [entries, setEntries] = useState<Entry[]>([newEntry()])
-  const [imageFiles, setImageFiles] = useState<File[]>([])
   const [error, setError] = useState('')
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const supabase = createClient()
@@ -83,28 +83,29 @@ export default function DocumentsPage() {
     setUploading(true); setError('')
     const { data: { user } } = await supabase.auth.getUser()
 
-    const image_urls: string[] = []
-    for (const file of imageFiles) {
-      try {
-        const ext = file.name.split('.').pop()
-        const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-        const { error: uploadError } = await supabase.storage.from('attachments').upload(fileName, file, { upsert: true })
-        if (!uploadError) {
-          const { data } = supabase.storage.from('attachments').getPublicUrl(fileName)
-          image_urls.push(data.publicUrl)
-        }
-      } catch {}
-    }
-
-    const rows = valid.map(en => ({
-      sender_name: en.sender_name,
-      received_date: en.received_date,
-      department: en.department,
-      sent_to_hq_date: en.sent_to_hq_date || null,
-      note: en.note || null,
-      cost: null,
-      image_urls: image_urls.length > 0 ? image_urls : null,
-      user_id: user?.id
+    const rows = await Promise.all(valid.map(async en => {
+      const image_urls: string[] = []
+      for (const file of en.imageFiles) {
+        try {
+          const ext = file.name.split('.').pop()
+          const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+          const { error: uploadError } = await supabase.storage.from('attachments').upload(fileName, file, { upsert: true })
+          if (!uploadError) {
+            const { data } = supabase.storage.from('attachments').getPublicUrl(fileName)
+            image_urls.push(data.publicUrl)
+          }
+        } catch {}
+      }
+      return {
+        sender_name: en.sender_name,
+        received_date: en.received_date,
+        department: en.department,
+        sent_to_hq_date: en.sent_to_hq_date || null,
+        note: en.note || null,
+        cost: null,
+        image_urls: image_urls.length > 0 ? image_urls : null,
+        user_id: user?.id
+      }
     }))
 
     const { error: insertError } = await supabase.from('gg_documents').insert(rows)
@@ -207,6 +208,19 @@ export default function DocumentsPage() {
                   <div className="md:col-span-2">
                     <input placeholder="หมายเหตุ" value={en.note} onChange={e => updateEntry(i, { note: e.target.value })} className={inputClass} />
                   </div>
+
+                  {/* แนบรูปของแต่ละคน */}
+                  <div className="md:col-span-2">
+                    <label className="text-xs text-gray-400 mb-1 block">แนบรูปภาพ (เลือกได้หลายรูป)</label>
+                    <input type="file" accept="image/*" multiple
+                      onChange={e => updateEntry(i, { imageFiles: Array.from(e.target.files || []) })}
+                      className="text-sm text-gray-400" />
+                    {en.imageFiles.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {en.imageFiles.map((f, fi) => <span key={fi} className="text-xs bg-[#1a1a1a] text-gray-300 px-2 py-1 rounded">{f.name}</span>)}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -216,17 +230,6 @@ export default function DocumentsPage() {
               className="flex items-center gap-2 justify-center py-3 border-2 border-dashed border-[#C9922A]/40 rounded-xl text-[#C9922A] hover:border-[#C9922A] hover:bg-[#C9922A]/10 transition-colors text-sm">
               <span className="text-xl leading-none">+</span> เพิ่มรายการถัดไป
             </button>
-          </div>
-
-          {/* แนบรูป */}
-          <div className="mt-4">
-            <label className="text-xs text-gray-400 mb-1 block">แนบรูปภาพ (เลือกได้หลายรูป)</label>
-            <input type="file" accept="image/*" multiple onChange={e => setImageFiles(Array.from(e.target.files || []))} className="text-sm text-gray-400" />
-            {imageFiles.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {imageFiles.map((f, i) => <span key={i} className="text-xs bg-[#242424] text-gray-300 px-2 py-1 rounded">{f.name}</span>)}
-              </div>
-            )}
           </div>
 
           {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
